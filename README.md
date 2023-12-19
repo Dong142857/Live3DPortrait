@@ -5,9 +5,8 @@ This is a unofficial implement of [Live3DPortrait: Real-Time Radiance Fields for
 ![display2](./docs/display2.png)
 ![display3](./docs/display3.png)
 
-<video width="320" height="240" controls>
-    <source src="./docs/output.mp4" type="video/mp4">
-</video>
+https://github.com/Dong142857/Live3DPortrait/assets/47628302/ce27ffc3-67d2-4174-8c20-b4086b5d08e4
+
 
 
 ## Pretrained Model
