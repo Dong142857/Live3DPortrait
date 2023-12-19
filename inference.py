@@ -149,8 +149,6 @@ if __name__ == '__main__':
     model_path = args.model
     image_path = args.image
     output_path = args.output
-    if not os.path.exists(output_path):
-        os.mkdir(output_path)
 
     # load model
     model_dict = torch.load(model_path)

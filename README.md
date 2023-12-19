@@ -1,5 +1,5 @@
 # Unofficial implement of Live3DPortrait
-This is an unofficial implement of [Live3DPortrait: Real-Time Radiance Fields for Single-Image Portrait View Synthesis](https://research.nvidia.com/labs/nxp/lp3d/) in Pytorch. 
+This is a unofficial implement of [Live3DPortrait: Real-Time Radiance Fields for Single-Image Portrait View Synthesis](https://research.nvidia.com/labs/nxp/lp3d/) in Pytorch. 
 
 ![display1](./docs/display1.png)
 ![display2](./docs/display2.png)
@@ -10,7 +10,7 @@ https://github.com/Dong142857/Live3DPortrait/assets/47628302/ce27ffc3-67d2-4174-
 
 
 ## Pretrained Model
-The checkpoints can be downloaded from [here](https://drive.google.com/drive/folders/1Z6uri8pH048Qzyhu0PE3llxO5EC7ic_v?usp=drive_link). 
+The checkpoints can be download from [here](https://drive.google.com/drive/folders/1Z6uri8pH048Qzyhu0PE3llxO5EC7ic_v?usp=drive_link). 
 Place them under `./pretrained_models/` folder.
 
 ```
