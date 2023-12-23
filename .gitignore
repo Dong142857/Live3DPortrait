@@ -129,5 +129,5 @@ dmypy.json
 .pyre/
 
 # own project
-.output/
-.pretrained_models/
+output/
+pretrained_models/

@@ -11,6 +11,7 @@ https://github.com/Dong142857/Live3DPortrait/assets/47628302/ce27ffc3-67d2-4174-
 
 ## Pretrained Model
 The checkpoints can be downloaded from [here](https://drive.google.com/drive/folders/1Z6uri8pH048Qzyhu0PE3llxO5EC7ic_v?usp=drive_link). 
+<!-- InceptionV3 pretrained model comes from [here](https://github.com/mseitzer/pytorch-fid/releases). -->
 Place them under `./pretrained_models/` folder.
 
 ```

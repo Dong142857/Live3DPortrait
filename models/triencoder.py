@@ -124,7 +124,7 @@ class TriEncoder(nn.Module):
         return img
 
     def set_encoder(self):
-        self.encoder = EG3DInvEncoder(in_channels=5, encoder_name="resnet34", encoder_depth=3, mode="Normal", use_bn=False)
+        self.encoder = EG3DInvEncoder(in_channels=5, encoder_name="resnet34", encoder_depth=3, mode="LT", use_bn=False)
 
     def forward(self, x, c):
         '''
