@@ -24,6 +24,8 @@ class Coach:
 			self.wb_logger = WBLogger(self.opts)
 
 		self.seed_everything(self.opts.seed)
+		if opts.resume:
+			self.resume_path = opts.resume_path
 		# Initialize network
 		# self.net = TriEncoder(self.opts).to(self.device)
 		self.net = TriEncoder().to(self.device)
@@ -97,23 +99,23 @@ class Coach:
 		elif mode == "fov":
 			return (torch.rand(1, device=self.device) - 0.5) * fov_range + 18.837
 
-	def load_pretrain_model(self):
-		path = model_paths['encoder_render']
+	def load_pretrain_model(self, path):
+		# path = model_paths['encoder_render']
 		ckpt = torch.load(path, map_location="cpu")
 		# for encoder 
-		# self.net.encoder.load_state_dict(ckpt["encoder_state_dict"])
-		# self.net.encoder.requires_grad_(False)
+		self.net.encoder.load_state_dict(ckpt["encoder_state_dict"])
+		self.net.encoder.requires_grad_(True)
 		# for renderer 
 		self.net.triplane_renderer.load_state_dict(ckpt["renderer_state_dict"])
 		self.net.triplane_renderer.requires_grad_(False)
 
 		# for optimizer
-		# self.optimizer_encoder.load_state_dict(ckpt["encoder_optimizer"])
-		# self.optimizer_renderer.load_state_dict(ckpt["renderer_optimizer"])
+		self.optimizer_encoder.load_state_dict(ckpt["encoder_optimizer"])
+		self.optimizer_renderer.load_state_dict(ckpt["render_optimizer"])
 
 		# for discriminator
-		# self.net.D.load_state_dict(ckpt["discriminator_state"])
-		# self.net.D.requires_grad_(False)
+		self.net.D.load_state_dict(ckpt["discriminator_state"])
+		self.net.D.requires_grad_(True)
 
 
 	def validate(self):
@@ -124,9 +126,11 @@ class Coach:
 
 	def train_encoder(self):
 		self.net.train()
-		self.load_pretrain_model()
+		if self.opts.resume:
+			self.load_pretrain_model(self.resume_path)
 		D = self.net.D
 		D.requires_grad_(True)
+
 		self.net.encoder.requires_grad_(True)
 		while self.global_step < self.opts.max_steps: 
 			self.optimizer_renderer.zero_grad()

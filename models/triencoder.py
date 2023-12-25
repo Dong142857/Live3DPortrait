@@ -17,9 +17,10 @@ from models.eg3d.camera_utils import FOV_to_intrinsics, LookAtPoseSampler
 from models.eg3d.dual_discriminator import DualDiscriminator
 
 class TriEncoder(nn.Module):
-    def __init__(self):
+    def __init__(self, mode="LT"):
         super(TriEncoder, self).__init__()
         self.device = "cuda"
+        self.mode = mode
         self.set_encoder()
         self.set_eg3d()
 
@@ -124,7 +125,7 @@ class TriEncoder(nn.Module):
         return img
 
     def set_encoder(self):
-        self.encoder = EG3DInvEncoder(in_channels=5, encoder_name="resnet34", encoder_depth=3, mode="LT", use_bn=False)
+        self.encoder = EG3DInvEncoder(in_channels=5, encoder_name="resnet34", encoder_depth=3, mode=self.mode, use_bn=False)
 
     def forward(self, x, c):
         '''

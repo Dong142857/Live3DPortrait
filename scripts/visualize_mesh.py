@@ -10,6 +10,16 @@ from matplotlib import pyplot as plt
 '''
     This code is used to visualize the mesh of the 3D model.
 '''
+# 使用pyrender进行可视化ply文件
+#
+# import trimesh
+# import pyrender
+# import numpy as np
+#
+# mesh = trimesh.load('output/mesh_1.ply')
+# scene = pyrender.Scene()
+# scene.add(pyrender.Mesh.from_trimesh(mesh))
+# pyrender.Viewer(scene, use_raymond_lighting=True)
 
 
 def normalize_vecs(vectors):
@@ -58,30 +68,70 @@ def sample(horizontal_mean, vertical_mean, lookat_position, horizontal_stddev=0,
     forward_vectors = normalize_vecs(lookat_position - camera_origins)
     return create_cam2world_matrix(forward_vectors, camera_origins)
 
+trans_t = lambda t : np.array([
+    [1,0,0,0],
+    [0,1,0,0],
+    [0,0,1,t],
+    [0,0,0,1],
+], dtype=np.float32)
+
+rot_phi = lambda phi : np.array([
+    [1,0,0,0],
+    [0,np.cos(phi),-np.sin(phi),0],
+    [0,np.sin(phi), np.cos(phi),0],
+    [0,0,0,1],
+], dtype=np.float32)
+
+rot_theta = lambda th : np.array([
+    [np.cos(th),0,-np.sin(th),0],
+    [0,1,0,0],
+    [np.sin(th),0, np.cos(th),0],
+    [0,0,0,1],
+], dtype=np.float32)
+
+
+def pose_spherical(theta, phi, radius):
+    c2w = trans_t(radius)
+    c2w = rot_phi(phi/180.*np.pi) @ c2w
+    c2w = rot_theta(theta/180.*np.pi) @ c2w
+    c2w = np.array([[-1,0,0,0],[0,0,1,0],[0,1,0,0],[0,0,0,1]]) @ c2w
+    return c2w
 
 # camera_params = np.concatenate([cam2world_pose.reshape(-1, 16), intrinsics], 1)
 
 def plot_3d(mesh):
     scene = pyrender.Scene()
-    scene.add(pyrender.Mesh.from_trimesh(mesh, smooth=False))
+    scene.add(pyrender.Mesh.from_trimesh(mesh))
     # scene.add(pyrender.Mesh.from_trimesh(mesh, smooth=True))
 
     # Set up the camera -- z-axis away from the scene, x-axis right, y-axis up
-    # camera = pyrender.PerspectiveCamera(yfov=2 * 18.834 * np.pi / 180.0, aspectRatio=1.0)
-    camera = pyrender.PerspectiveCamera(yfov=np.pi/3.0)
+    # camera = pyrender.PerspectiveCamera(yfov=18.834 * np.pi / 180.0, aspectRatio=1.0)
+    camera = pyrender.PerspectiveCamera(yfov=18.834 * np.pi / 180.0)
 
-    # camera_pose = pose_spherical(-20., -40., 1.).numpy()
+    # mesh = pyrender.Mesh.from_trimesh(mesh)
+    # light = pyrender.SpotLight(color=np.ones(3), intensity=3.0,
+    #             innerConeAngle=np.pi/4)
+    # r = pyrender.OffscreenRenderer(512, 512)
+    # camera = pyrender.OrthographicCamera(xmag=0.6, ymag=0.6)
+
+    # camera_pose = pose_spherical(0., 0., 800.)
     cam_pivot = [0, 0, 0]
     cam_radius = 2.7
-    cam2world_pose = sample(-np.pi/2 + np.pi/4, np.pi/3, cam_pivot, radius=cam_radius)
+    cam2world_pose = sample(0, np.pi/2, cam_pivot, radius=cam_radius)
     camera_pose = cam2world_pose
-    nc = pyrender.Node(camera=camera, matrix=camera_pose)
-    scene.add_node(nc)
+    camera_pose[:, 0] = -camera_pose[:, 0]
+    # camera_pose[:, 1] = -camera_pose[:, 1]
+    # camera_pose[:, 2] = -camera_pose[:, 2]
+    # camera_pose[:3, 3] = 512 * camera_pose[:3, 3]
+    # nc = pyrender.Node(camera=camera, matrix=camera_pose)
+    # scene.add_node(nc)
+    scene.add(camera, pose=camera_pose)
 
     # Set up the light -- a point light in the same spot as the camera
-    light = pyrender.PointLight(color=np.ones(3), intensity=4.0)
-    nl = pyrender.Node(light=light, matrix=camera_pose)
-    scene.add_node(nl)
+    light = pyrender.SpotLight(color=np.ones(3), intensity=4.0, innerConeAngle=np.pi/16.0)
+    # nl = pyrender.Node(light=light, matrix=camera_pose)
+    # scene.add_node(nl)
+    scene.add(light, pose=camera_pose)
 
     # Render the scene
     r = pyrender.OffscreenRenderer(512, 512)
@@ -89,8 +139,11 @@ def plot_3d(mesh):
 
     # save the image
     print(color)
+    print(depth.min(), depth.max())
+    color = ((color - color.min())/ (color.max() - color.min()) * 255.0).astype(np.uint8)
+    depth = (depth - depth.min())/ (depth.max() - depth.min()) * 255.0
     plt.imsave("output/mesh_1.png", color)
-    plt.imsave("output/mesh_1_depth.png", depth)
+    plt.imsave("output/mesh_1_depth.png", (depth).astype(np.uint8))
 
 
 
@@ -98,8 +151,19 @@ if __name__ == '__main__':
 
     mesh_path = "output/mesh_1.ply"
     mesh = trimesh.load(mesh_path)
-    print(mesh.vertices.shape)
-    print(mesh.faces.shape)
+
+    # b_min_np = np.array([-bound, -bound, -bound])
+    # b_max_np = np.array([ bound,  bound,  bound])
+    
+    # vertices = vertices / (resolution - 1.0) * (b_max_np - b_min_np)[None, :] + b_min_np[None, :]
+    # return vertices.astype('float32'), faces
+
+    mesh.vertices = 2.0 * (mesh.vertices / 511.0) - 1.0
+    # print(mesh.vertices)
+    # print(mesh.vertices.shape)
+    # print(mesh.faces.shape)
     plot_3d(mesh)
 
-    pass
+    
+
+    

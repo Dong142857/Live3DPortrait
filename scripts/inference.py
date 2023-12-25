@@ -1,5 +1,5 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 import torch
 import argparse
 import numpy as np
@@ -148,17 +148,19 @@ if __name__ == '__main__':
     parser.add_argument('--output', type=str, default='./output', help='output path')
     parser.add_argument('--save_mesh', type=bool, default=True, help='If true, save mesh')
     parser.add_argument('--save_video', type=bool, default=True, help='If true, save video')
+    parser.add_argument('--mode', type=str, default='Normal', help='mode of triplane generation', choices=['LT', 'Normal'])
     args = parser.parse_args()
 
     model_path = args.model
     image_path = args.image
     output_path = args.output
+    mode = args.mode
     if not os.path.exists(output_path):
         os.mkdir(output_path)
 
     # load model
     model_dict = torch.load(model_path)
-    net = TriEncoder()
+    net = TriEncoder(mode=mode)
     net.encoder.load_state_dict(model_dict['encoder_state_dict'])
     net.triplane_renderer.load_state_dict(model_dict['renderer_state_dict'])
 

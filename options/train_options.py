@@ -9,10 +9,11 @@ class TrainOptions:
 		self.initialize()
 
 	def initialize(self):
-		self.parser.add_argument('--exp_dir', default=os.path.join(os.path.dirname(__file__), '../exp'), type=str, help='Path to experiment output directory')
+		self.parser.add_argument('--exp_dir', default=os.path.join(os.path.dirname(__file__), '../exp1'), type=str, help='Path to experiment output directory')
 		self.parser.add_argument('--device', default='cuda:0', type=str, help='CUDA device to train the model on')
 		self.parser.add_argument('--batch_size', default=2, type=int, help='Batch size for training')
 		self.parser.add_argument('--seed', default=42, type=int, help='Seed for random number generators')
+
 
 		self.parser.add_argument('--lr_D', default=0.00001, type=float, help='Optimizer learning rate for discriminator')
 		self.parser.add_argument('--learning_rate_encoder', default=0.00002, type=float, help='Optimizer learning rate for encoder')
@@ -31,7 +32,7 @@ class TrainOptions:
 		
 		self.parser.add_argument('--checkpoint_path', default=None, type=str, help='Path to model checkpoint to continue training')
 
-		self.parser.add_argument('--max_steps', default=200000, type=int, help='Maximum number of training steps')
+		self.parser.add_argument('--max_steps', default=1000000, type=int, help='Maximum number of training steps')
 		self.parser.add_argument('--image_interval', default=1000, type=int, help='Interval for logging train images during training')
 		self.parser.add_argument('--board_interval', default=50, type=int, help='Interval for logging metrics to tensorboard')
 		self.parser.add_argument('--print_interval', default=1, type=int, help='Print interval')
@@ -46,6 +47,10 @@ class TrainOptions:
 
 		# arguments for weights & biases support
 		self.parser.add_argument('--use_wandb', action="store_true", help='Whether to use Weights & Biases to track experiment.')
+
+		self.parser.add_argument('--resume', default=True, type=bool, help='Resume training from previous checkpoint if available')
+		self.parser.add_argument('--resume_path', default=os.path.join(os.path.dirname(__file__), '../exp/checkpoints/iteration_200000.pt'), type=str, help='Path to .pt checkpoint to resume training')
+
 
 	def parse(self):
 		opts = self.parser.parse_args()

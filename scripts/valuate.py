@@ -1,5 +1,5 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 import torch
 import numpy as np
 from scipy import linalg
@@ -53,9 +53,8 @@ def calc_fid(sample_mean, sample_cov, real_mean, real_cov, eps=1e-6):
     return fid
 
 @torch.no_grad()
-def compute_fid(net, model_path, batch_size, n_sample=10000):
-    inception = InceptionV3([3], normalize_input=False).to(device)
-    inception.eval()
+def compute_fid(net, inception, model_path, batch_size, n_sample=10000):
+    basename = os.path.basename(model_path)
 
     n_batch = n_sample // batch_size
     resid = n_sample - (n_batch * batch_size)
@@ -66,27 +65,31 @@ def compute_fid(net, model_path, batch_size, n_sample=10000):
     sample_mean = np.load(val_paths['ffhq_mean'])
     sample_cov = np.load(val_paths['ffhq_cov'])
 
-    # ---------------------------------------------------------------------------------------------------------
-    print("pred.....")
-    pred_features = []
-    for batch in tqdm(batch_sizes):
-        # print(batch)
-        _, encoder_input, camera_param, ws = net.sample_triplane(batch, gen_rand_pose(pitch_range=26, mode='pitch'), gen_rand_pose(yaw_range=49, mode='yaw'))
-        gen_triplanes = net.encoder(encoder_input['image'])
-        render_res = net.triplane_renderer(gen_triplanes, camera_param)
-        # mul_res, _ = net.render_from_pretrain(batch, gen_rand_pose(pitch_range=26, mode='pitch'), gen_rand_pose(yaw_range=49, mode='yaw'), ws) # 
-        img = render_res['image']
-        # img = mul_res['image']
-        feat = inception(img)[0].view(img.shape[0], -1)
-        pred_features.append(feat.to("cpu"))
-    pred_features = torch.cat(pred_features, 0).numpy()
-    pred_sample_mean = np.mean(pred_features, 0)
-    pred_sample_cov = np.cov(pred_features, rowvar=False)
+    mean_savepath = f"assets/temp/{basename}_fid_pred_sample_mean{n_sample}.npy"
+    cov_savepath = f"assets/temp/{basename}_fid_pred_sample_cov{n_sample}.npy"
+    if os.path.isfile(mean_savepath) and os.path.isfile(cov_savepath):
+        pred_sample_mean = np.load(mean_savepath)
+        pred_sample_cov = np.load(cov_savepath)
+    else:
+        print("pred.....")
+        pred_features = []
+        for batch in tqdm(batch_sizes):
+            # print(batch)
+            _, encoder_input, camera_param, ws = net.sample_triplane(batch, gen_rand_pose(pitch_range=26, mode='pitch'), gen_rand_pose(yaw_range=49, mode='yaw'))
+            gen_triplanes = net.encoder(encoder_input['image'])
+            render_res = net.triplane_renderer(gen_triplanes, camera_param)
+            # mul_res, _ = net.render_from_pretrain(batch, gen_rand_pose(pitch_range=26, mode='pitch'), gen_rand_pose(yaw_range=49, mode='yaw'), ws) # 
+            img = render_res['image']
+            # img = mul_res['image']
+            feat = inception(img)[0].view(img.shape[0], -1)
+            pred_features.append(feat.to("cpu"))
+        pred_features = torch.cat(pred_features, 0).numpy()
+        pred_sample_mean = np.mean(pred_features, 0)
+        pred_sample_cov = np.cov(pred_features, rowvar=False)
 
-    basename = os.path.basename(model_path)
-    np.save(f"assets/temp/{basename}_fid_pred_sample_cov{n_sample}.npy", pred_sample_mean)
-    np.save(f"assets/temp/{basename}_fid_pred_sample_cov{n_sample}.npy", pred_sample_cov)
-    print("pred done")
+        np.save(f"assets/temp/{basename}_fid_pred_sample_mean{n_sample}.npy", pred_sample_mean)
+        np.save(f"assets/temp/{basename}_fid_pred_sample_cov{n_sample}.npy", pred_sample_cov)
+        print("pred done")
     print("calc fid....")
     # ---------------------------------------------------------------------------------------------------------
     fid = calc_fid(pred_sample_mean, pred_sample_cov, sample_mean, sample_cov)
@@ -101,12 +104,15 @@ def testfid50k(model_path):
     net.encoder.load_state_dict(model_dict['encoder_state_dict'])
     net.triplane_renderer.load_state_dict(model_dict['renderer_state_dict'])
 
-    compute_fid(net, model_path, batch_size=16, n_sample=50000)
-    del net
+    inception = InceptionV3([3], normalize_input=False).to(device)
+    inception.eval()
+    compute_fid(net, inception, model_path, batch_size=8, n_sample=50000)
+    del net, inception
 
 def main():
     ckpt_path = "exp/checkpoints"
-    ckpt_list = os.listdir(ckpt_path)
+    # ckpt_list = os.listdir(ckpt_path)
+    ckpt_list = ['iteration_200000.pt']
     for ckpt in ckpt_list:
         if ckpt.endswith(".pt"):
             model_path = os.path.join(ckpt_path, ckpt)
