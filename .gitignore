@@ -2,7 +2,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
-
+*.pyc
 # C extensions
 *.so
 
@@ -129,5 +129,10 @@ dmypy.json
 .pyre/
 
 # own project
-.output/
-.pretrained_models/
+output/
+pretrained_models/
+exp*/
+debug_image*/
+assets/
+data_utils/
+```

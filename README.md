@@ -11,6 +11,7 @@ https://github.com/Dong142857/Live3DPortrait/assets/47628302/ce27ffc3-67d2-4174-
 
 ## Pretrained Model
 The checkpoints can be downloaded from [here](https://drive.google.com/drive/folders/1Z6uri8pH048Qzyhu0PE3llxO5EC7ic_v?usp=drive_link). 
+<!-- InceptionV3 pretrained model comes from [here](https://github.com/mseitzer/pytorch-fid/releases). -->
 Place them under `./pretrained_models/` folder.
 
 ```
@@ -29,12 +30,12 @@ python inference.py --input ./imgs/input.png --output ./imgs/output.png --checkp
 ```
 
 Notice that the input image should be preprocessed folowing the [EG3D](https://github.com/NVlabs/eg3d).
+Note that the LT model implement has some difference with the original implement, but achieve the nearly same performance.
 
 ## TODO
 - [x] Upload inference code and checkpoint.
-- [ ] Release Training code.
-- [ ] Release LT model and checkpoint.
-
+- [x] Release Training code.
+- [x] Release LT model and checkpoint.
 
 
 

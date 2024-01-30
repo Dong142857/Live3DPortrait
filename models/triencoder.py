@@ -17,9 +17,10 @@ from models.eg3d.camera_utils import FOV_to_intrinsics, LookAtPoseSampler
 from models.eg3d.dual_discriminator import DualDiscriminator
 
 class TriEncoder(nn.Module):
-    def __init__(self):
+    def __init__(self, mode="LT"):
         super(TriEncoder, self).__init__()
         self.device = "cuda"
+        self.mode = mode
         self.set_encoder()
         self.set_eg3d()
 
@@ -43,7 +44,8 @@ class TriEncoder(nn.Module):
 
         img_resolution, img_channels = 512, 3
         
-        with open(paths_config.model_paths["eg3d_rebalanced"], 'rb') as f:
+        with open(paths_config.pretrained_model_path, 'rb') as f:
+        # with open(paths_config.model_paths["lpff_weighs"], 'rb') as f:
             resume_data = torch.load(f)
             self.G = TriPlaneGenerator(*resume_data["G_init_args"], **resume_data["G_init_kwargs"]).eval().requires_grad_(False).to(self.device)
             self.G.load_state_dict(resume_data['G'])
@@ -78,7 +80,7 @@ class TriEncoder(nn.Module):
         intrinsics = self.FOV_cxy_to_intrinsics(fov_deg, cx, cy, device=self.device).reshape(-1, 9).repeat(batch_size, 1)
         cam_pivot = torch.tensor(self.triplane_renderer.rendering_kwargs.get('avg_camera_pivot', [0, 0, 0.2]), device=self.device)
         cam_radius = self.triplane_renderer.rendering_kwargs.get('avg_camera_radius', 2.7)
-        cam2world_pose = LookAtPoseSampler.sample(pitch, yaw, cam_pivot, radius=cam_radius, batch_size=batch_size, device=self.device)
+        cam2world_pose = LookAtPoseSampler.sample(yaw, pitch, cam_pivot, radius=cam_radius, batch_size=batch_size, device=self.device)
         camera_params = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics], 1)
         return camera_params
 
@@ -113,8 +115,8 @@ class TriEncoder(nn.Module):
         fov_deg = 18.837
         intrinsics = FOV_to_intrinsics(fov_deg, device=self.device).reshape(-1, 9).repeat(batch_size, 1)
         # cam2world_pose = LookAtPoseSampler.sample(np.pi/2 + angle_y, np.pi/2 + angle_p, cam_pivot, radius=cam_radius, device=device)
-        cam2world_pose = LookAtPoseSampler.sample(pitch, yaw, cam_pivot, radius=cam_radius, batch_size=batch_size, device=self.device)
-        conditioning_cam2world_pose = LookAtPoseSampler.sample(pitch, yaw, cam_pivot, radius=cam_radius, batch_size=batch_size, device=self.device)
+        cam2world_pose = LookAtPoseSampler.sample(yaw, pitch, cam_pivot, radius=cam_radius, batch_size=batch_size, device=self.device)
+        conditioning_cam2world_pose = LookAtPoseSampler.sample(yaw, pitch, cam_pivot, radius=cam_radius, batch_size=batch_size, device=self.device)
         camera_params = torch.cat([cam2world_pose.reshape(-1, 16), intrinsics], 1)
         conditioning_params = torch.cat([conditioning_cam2world_pose.reshape(-1, 16), intrinsics], 1)
         ws = self.G.mapping(z, conditioning_params, truncation_psi=truncation_psi, truncation_cutoff=truncation_cutoff)
@@ -124,7 +126,7 @@ class TriEncoder(nn.Module):
         return img
 
     def set_encoder(self):
-        self.encoder = EG3DInvEncoder(in_channels=5, encoder_name="resnet34", encoder_depth=3, mode="Normal", use_bn=False)
+        self.encoder = EG3DInvEncoder(in_channels=5, encoder_name="resnet34", encoder_depth=3, mode=self.mode, use_bn=False)
 
     def forward(self, x, c):
         '''

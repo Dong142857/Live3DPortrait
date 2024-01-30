@@ -8,6 +8,7 @@ from segmentation_models_pytorch.decoders.deeplabv3 import DeepLabV3
 '''
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
 import math
+import time
 from einops import rearrange, repeat
 
 import sys
@@ -163,7 +164,8 @@ class EncoderEhigh(nn.Module):
             nn.Conv2d(96, 96, kernel_size=3, stride=1, padding=1), 
             nn.LeakyReLU(negative_slope=0.01)
         ) if self.mode == "Normal" else nn.Sequential(
-            nn.Conv2d(5, 64, kernel_size=7, stride=2, padding=3),  # 自己加的
+            # Input is Second layer output of DeeplabV3
+            nn.Conv2d(5, 64, kernel_size=7, stride=2, padding=3),  
             nn.LeakyReLU(negative_slope=0.01), 
             nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1), 
             nn.LeakyReLU(negative_slope=0.01),         
@@ -270,6 +272,8 @@ class EncoderFinal(nn.Module):
         else:
             self.pathembed = OverlapPatchEmbed(img_size=128, stride=2, in_chans=256, embed_dim=1024)
             self.block = Block(dim=1024, num_heads=2, mlp_ratio=2, sr_ratio=2)
+            # self.pathembed = OverlapPatchEmbed(img_size=128, stride=2, in_chans=128, embed_dim=1024)
+            # self.block = Block(dim=256, num_heads=2, mlp_ratio=2, sr_ratio=2)
         
         self.pixelShuffel = nn.PixelShuffle(upscale_factor=2)
 
@@ -331,12 +335,10 @@ class EG3DInvEncoder(nn.Module):
         encoder_name="resnet34",
         encoder_depth=3,
         mode="Normal",
-        device="cuda",
         use_bn=False,
     ) -> None:
         super(EG3DInvEncoder, self).__init__()
         self.mode = mode
-        self.device = device
         deeplab = DeepLabV3(in_channels=in_channels, encoder_name=encoder_name, encoder_depth=encoder_depth) # encoder_depth [3, 5]
         self.encoder = deeplab.encoder
         self.decoder = deeplab.decoder
@@ -383,22 +385,33 @@ class EG3DInvEncoder(nn.Module):
     def forward(self, x):
         # x is [B, 5, H, W]
         chan_num = x.shape[1]
+        device = x.device
         if chan_num == 3:
             # use coordnate as the fourth and fifth channle 
             B = x.shape[0]
             H, W = x.shape[2], x.shape[3]
             grid_x, grid_y = torch.meshgrid(torch.arange(H), torch.arange(W), indexing='ij')
-            grid_x = repeat(grid_x, "h w -> b c h w", b=B, c=1).to(self.device)
-            grid_y = repeat(grid_y, "h w -> b c h w", b=B, c=1).to(self.device)
+            grid_x = repeat(grid_x, "h w -> b c h w", b=B, c=1).to(device)
+            grid_y = repeat(grid_y, "h w -> b c h w", b=B, c=1).to(device)
             # print(x.shape, grid_x.shape, grid_y.shape)
             x = torch.cat([x, grid_x, grid_y], dim=1)
             chan_num = x.shape[1]
 
         assert chan_num == 5, "x.shape[1] shoule be 5"
-        low_feature = self.decoder(self.encoder(x)[-1])
+        x_encode = self.encoder(x)
+        low_feature = self.decoder(x_encode[-1])
+        # low_feature = self.decoder(*x_encode)
         f_feature = self.F_encoder(low_feature)
         high_feature = self.EHigh_encoder(x)
+        # if self.mode == "Normal":
+        #     high_feature = self.EHigh_encoder(x)
+        # elif self.mode == "LT":
+        #     high_feature = self.EHigh_encoder(x_encode[1])
+        # else:
+        #     raise ValueError("mode should be Normal or LT")
         output = self.Final_encoder(high_feature, f_feature)
+
+
         return output
 
 
@@ -442,27 +455,43 @@ def debug_test():
     # feature = final_layer(y, f_feature)
     # print(feature.shape) # [2, 96, 256, 256]
     ############################
-    device = 'cpu'
+    device = 'cuda'
     render_options = config_option()
-    B = 2
+    B = 1
     # plane = torch.rand((B, 96, 256, 256)) # 可以修改为其他的分辨率
-    a = torch.rand((B, 5, 512, 512))
-    m = EG3DInvEncoder(in_channels=5, encoder_name="resnet34", encoder_depth=3, mode="Normal", use_bn=False)
-    # plane = m(a).contiguous()
+    a = torch.rand((B, 5, 512, 512)).to(device)
+    m = EG3DInvEncoder(in_channels=5, encoder_name="resnet34", encoder_depth=3, mode="LT", use_bn=False).to(device)
+
+    m.eval()
+    for i in range(50):
+        a = torch.rand((B, 5, 512, 512)).to(device)
+        s1 = time.time()
+        plane = m(a).contiguous()
+        s2 = time.time()
+        print("time: {} ms".format((s2 - s1 ) * 1000))
+    print(plane.shape)
     # # print(plane.shape)
-    # # c = torch.rand((B, 25))
     # c = [0.8452497124671936, 0.028885385021567345, -0.5335903167724609, 1.3744339756005164, -0.03056236356496811, -0.9942903518676758, -0.10223815590143204, 0.27722038701208845, -0.5334968566894531, 0.10272454470396042, -0.8395407795906067, 2.307396824072493, 0.0, 0.0, 0.0, 1.0, 4.2647, 0.0, 0.5, 0.0, 4.2647, 0.5, 0.0, 0.0, 1.0]
     # c = torch.tensor(c).repeat((B, 1))
     # print(c.shape)
-    # render = TriplaneRenderer(img_resolution=512, img_channels=3, rendering_kwargs=render_options)
-    # d = render(plane, c)
-    print(list(m.named_parameters()))
-    print(list(m.named_modules()))
+    
+    print("Rendering... ")
+    render = TriplaneRenderer(img_resolution=512, img_channels=3, rendering_kwargs=render_options).to(device)
+
+    for i in range(50):
+        c = torch.rand((B, 25)).to(device)
+        s1 = time.time()
+        d = render(plane, c)
+        s2 = time.time()
+        print("time: {} ms".format((s2 - s1 ) * 1000))
+
+    # print(list(m.named_parameters()))
+    # print(list(m.named_modules()))
     # print(d['image'].shape)
     # print(d['image_raw'].shape)
     # print(d['image_depth'].shape)
     # print(d['feature_image'].shape)
     # print(d['planes'].shape)
 
-# if __name__ == '__main__':
-#     debug_test()
+if __name__ == '__main__':
+    debug_test()

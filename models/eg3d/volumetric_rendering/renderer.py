@@ -19,22 +19,37 @@ import torch.nn as nn
 
 from models.eg3d.volumetric_rendering.ray_marcher import MipRayMarcher2
 from models.eg3d.volumetric_rendering import math_utils
-
+from configs import render_config
 def generate_planes():
     """
     Defines planes by the three vectors that form the "axes" of the
     plane. Should work with arbitrary number of planes and planes of
     arbitrary orientation.
     """
-    return torch.tensor([[[1, 0, 0],
-                            [0, 1, 0],
-                            [0, 0, 1]],
-                            [[1, 0, 0],
-                            [0, 0, 1],
-                            [0, 1, 0]],
-                            [[0, 0, 1],
-                            [1, 0, 0],
-                            [0, 1, 0]]], dtype=torch.float32)
+    if render_config.triplanes_projection_mode == 'eg3d_projection':
+        return torch.tensor([[[1, 0, 0],
+                                [0, 1, 0],
+                                [0, 0, 1]],
+                                [[1, 0, 0],
+                                [0, 0, 1],
+                                [0, 1, 0]],
+                                [[0, 0, 1],
+                                [1, 0, 0],
+                                [0, 1, 0]]], dtype=torch.float32)
+    
+    elif render_config.triplanes_projection_mode == 'lpff_projection':
+        return torch.tensor([[[1, 0, 0],
+                                [0, 1, 0],
+                                [0, 0, 1]],
+                                [[1, 0, 0],
+                                [0, 0, 1],
+                                [0, 1, 0]],
+                                [[0, 0, 1],
+                                [0, 1, 0],
+                                [1, 0, 0]]], dtype=torch.float32)
+    else:
+        raise NotImplementedError(f"Unknown triplanes_projection_mode: {render_config.triplanes_projection_mode}")
+    
 
 def project_onto_planes(planes, coordinates):
     """
