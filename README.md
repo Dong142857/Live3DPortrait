@@ -30,12 +30,12 @@ python inference.py --input ./imgs/input.png --output ./imgs/output.png --checkp
 ```
 
 Notice that the input image should be preprocessed folowing the [EG3D](https://github.com/NVlabs/eg3d).
+Note that the LT model implement has some difference with the original implement, but achieve the nearly same performance.
 
 ## TODO
 - [x] Upload inference code and checkpoint.
-- [ ] Release Training code.
-- [ ] Release LT model and checkpoint.
-
+- [x] Release Training code.
+- [x] Release LT model and checkpoint.
 
 
 
