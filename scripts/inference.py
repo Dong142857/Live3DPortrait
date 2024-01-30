@@ -1,5 +1,6 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+import time
 import torch
 import argparse
 import numpy as np
@@ -12,7 +13,6 @@ sys.path.append(".")
 sys.path.append("..")
 
 import imageio
-import os
 from tqdm import tqdm
 from configs.paths_config import model_paths
 from models.triencoder import TriEncoder
@@ -54,8 +54,8 @@ def generate_video(net, gen_triplanes, savepath, batch_size=1):
                 pitch_range = 0.25
                 yaw_range = 0.35
                 camera_p = net.eural_to_camera(batch_size, 
-                        3.14/2 + yaw_range * np.sin(2 * 3.14 * frame_idx / (num_keyframes * w_frames)),
                         3.14/2 -0.05 + pitch_range * np.cos(2 * 3.14 * frame_idx / (num_keyframes * w_frames)),
+                        3.14/2 + yaw_range * np.sin(2 * 3.14 * frame_idx / (num_keyframes * w_frames)),
                         )
                 render_res = net.triplane_renderer(gen_triplanes, camera_p)
                 img = render_res[image_mode][0]
@@ -133,7 +133,8 @@ def multi_view_output(net, gen_triplanes, savepath, batch_size=1):
     offset = np.linspace(-np.pi/6, np.pi/6, 8)
     imgs_list = []
     for p in offset:
-        camera_p = net.eural_to_camera(batch_size, np.pi/2 + p, np.pi/2)
+        camera_p = net.eural_to_camera(batch_size, np.pi/2, np.pi/2 + p) # pitch yawl
+        # print(camera_p)
         render_res = net.triplane_renderer(gen_triplanes, camera_p)
         img = render_res[image_mode][0]
         imgs_list.append(img.clamp(-1,1).squeeze(0).cpu().detach().permute((1,2,0)).numpy())
@@ -144,7 +145,7 @@ def multi_view_output(net, gen_triplanes, savepath, batch_size=1):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', type=str, default=model_paths["encoder_render"], help='model path')
-    parser.add_argument('--image', type=str, default='./imgs/1.jpg', help='image path')
+    parser.add_argument('--image', type=str, default='./imgs/3.png', help='image path')
     parser.add_argument('--output', type=str, default='./output', help='output path')
     parser.add_argument('--save_mesh', type=bool, default=True, help='If true, save mesh')
     parser.add_argument('--save_video', type=bool, default=True, help='If true, save video')

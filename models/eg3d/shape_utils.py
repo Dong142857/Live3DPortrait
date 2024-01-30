@@ -84,6 +84,7 @@ def convert_sdf_samples_to_ply(
     for i in range(0, num_verts):
         verts_tuple[i] = tuple(mesh_points[i, :])
 
+
     faces_building = []
     for i in range(0, num_faces):
         faces_building.append(((faces[i, :].tolist(),)))

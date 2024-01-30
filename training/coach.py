@@ -28,7 +28,7 @@ class Coach:
 			self.resume_path = opts.resume_path
 		# Initialize network
 		# self.net = TriEncoder(self.opts).to(self.device)
-		self.net = TriEncoder().to(self.device)
+		self.net = TriEncoder(mode="Normal").to(self.device)
 
 		# Initialize loss
 		self.mse_loss = nn.MSELoss().to(self.device).eval()
@@ -85,41 +85,60 @@ class Coach:
 		torch.manual_seed(seed)
 		torch.cuda.manual_seed_all(seed)
 
-	def gen_rand_pose(self, pitch_range=26, yaw_range=36, cx_range=0.2, cy_range=0.2, fov_range=4.8, mode="yaw"):
+	def gen_rand_pose(self, pitch_range=26, yaw_range=36, cx_range=0.1, cy_range=0.1, fov_range=2.4, mode="yaw"):
 		# set range
 		# pitch:  +-26, yaw: +-36/+-49
 		if mode == "yaw":
-			return (torch.rand(1, device=self.device) - 0.5) * (pitch_range / 180 * torch.pi) + torch.pi/2
+			return 2 * (torch.rand(1, device=self.device) - 0.5) * (yaw_range / 180 * torch.pi) + torch.pi/2
 		elif mode == "pitch":
-			return (torch.rand(1, device=self.device) - 0.5) * (yaw_range / 180 * torch.pi) + torch.pi/2
+			return 2 * (torch.rand(1, device=self.device) - 0.5) * (pitch_range / 180 * torch.pi) + torch.pi/2
 		elif mode == "cx":
-			return (torch.rand(1, device=self.device) - 0.5) * cx_range + 0.5
+			return 2 * (torch.rand(1, device=self.device) - 0.5) * cx_range + 0.5
 		elif mode == "cy":
-			return (torch.rand(1, device=self.device) - 0.5) * cy_range + 0.5
+			return 2 * (torch.rand(1, device=self.device) - 0.5) * cy_range + 0.5
 		elif mode == "fov":
-			return (torch.rand(1, device=self.device) - 0.5) * fov_range + 18.837
+			return 2 * (torch.rand(1, device=self.device) - 0.5) * fov_range + 18.837
 
 	def load_pretrain_model(self, path):
 		# path = model_paths['encoder_render']
 		ckpt = torch.load(path, map_location="cpu")
 		# for encoder 
-		self.net.encoder.load_state_dict(ckpt["encoder_state_dict"])
-		self.net.encoder.requires_grad_(True)
+		# self.net.encoder.load_state_dict(ckpt["encoder_state_dict"])
+		# self.net.encoder.requires_grad_(True)
 		# for renderer 
-		self.net.triplane_renderer.load_state_dict(ckpt["renderer_state_dict"])
-		self.net.triplane_renderer.requires_grad_(False)
-
+		# self.net.triplane_renderer.load_state_dict(ckpt["renderer_state_dict"])
+		# self.net.triplane_renderer.requires_grad_(True)
 		# for optimizer
-		self.optimizer_encoder.load_state_dict(ckpt["encoder_optimizer"])
-		self.optimizer_renderer.load_state_dict(ckpt["render_optimizer"])
+		if self.opts.resume_encoder_path is not None:
+			encoder_ckpt = torch.load(self.opts.resume_encoder_path, map_location="cpu")
+			# self.optimizer_encoder.load_state_dict(encoder_ckpt["encoder_optimizer"])
+			self.net.encoder.load_state_dict(encoder_ckpt["encoder_state_dict"])
+		else:
+			# self.optimizer_encoder.load_state_dict(ckpt["encoder_optimizer"])
+			self.net.encoder.load_state_dict(ckpt["encoder_state_dict"])
+
+		if self.opts.resume_render_path is not None:
+			render_ckpt = torch.load(self.opts.resume_render_path, map_location="cpu")
+			# self.optimizer_renderer.load_state_dict(render_ckpt["render_optimizer"])
+			self.net.triplane_renderer.load_state_dict(render_ckpt["renderer_state_dict"])
+		else:
+			# self.optimizer_renderer.load_state_dict(ckpt["render_optimizer"])
+			self.net.triplane_renderer.load_state_dict(ckpt["renderer_state_dict"])
+
+		self.net.encoder.requires_grad_(True)
+		self.net.triplane_renderer.requires_grad_(True)
 
 		# for discriminator
-		self.net.D.load_state_dict(ckpt["discriminator_state"])
+		# self.net.D.load_state_dict(ckpt["discriminator_state"])
 		self.net.D.requires_grad_(True)
+
+ 		# for global step
+		if "step" in ckpt:
+			self.global_step = ckpt['step']
 
 
 	def validate(self):
-		# fid50k test
+		# fid50k test, comsuming too much time
 		# inception_model = fid50k.load_inception_net(parallel=True)
 
 		pass
@@ -133,10 +152,12 @@ class Coach:
 
 		self.net.encoder.requires_grad_(True)
 		while self.global_step < self.opts.max_steps: 
-			self.optimizer_renderer.zero_grad()
+			# self.optimizer_renderer.zero_grad()
 			self.optimizer_encoder.zero_grad()
 			 
-			triplanes, gt_res, camera_param, ws = self.net.sample_triplane(self.opts.batch_size, self.gen_rand_pose(pitch_range=26, mode='pitch'), self.gen_rand_pose(yaw_range=49, mode='yaw'), fov_deg=self.gen_rand_pose(mode="fov"), cx=self.gen_rand_pose(mode="cx"), cy=self.gen_rand_pose(mode="cy"))
+			# triplanes, gt_res, camera_param, ws = self.net.sample_triplane(self.opts.batch_size, self.gen_rand_pose(pitch_range=26, mode='pitch'), self.gen_rand_pose(yaw_range=49, mode='yaw'), fov_deg=self.gen_rand_pose(mode="fov"), cx=self.gen_rand_pose(mode="cx"), cy=self.gen_rand_pose(mode="cy"))
+			rand_pitch, rand_yawl = self.gen_rand_pose(pitch_range=26, mode='pitch'), self.gen_rand_pose(yaw_range=49, mode='yaw')
+			triplanes, gt_res, camera_param, ws = self.net.sample_triplane(self.opts.batch_size, rand_pitch, rand_yawl, fov_deg=self.gen_rand_pose(mode="fov"), cx=self.gen_rand_pose(mode="cx"), cy=self.gen_rand_pose(mode="cy"))
 			mul_gt_res, mul_camera_params = self.net.render_from_pretrain(self.opts.batch_size, self.gen_rand_pose(pitch_range=26, mode='pitch'), self.gen_rand_pose(yaw_range=36, mode='yaw'), ws=ws, fov_deg=self.gen_rand_pose(mode="fov"), cx=self.gen_rand_pose(mode="cx"), cy=self.gen_rand_pose(mode="cy"))
 			gen_triplanes = self.net.encoder(gt_res['image'])
 			render_res = self.net.triplane_renderer(gen_triplanes, camera_param)
@@ -155,7 +176,7 @@ class Coach:
 					self.opts.lpips_lambda * raw_lpips_loss + self.opts.depth_lambda * depth_loss + \
 					self.opts.feature_lambda * feature_loss + self.opts.id_lambda * category_loss
 			
-			if self.opts.use_mul_loss or self.global_step > self.opts.apply_mul_loss_step:
+			if self.opts.use_mul_loss and self.global_step > self.opts.apply_mul_loss_step:
 				mul_render_res = self.net.triplane_renderer(gen_triplanes, mul_camera_params)
 				mul_image_loss = self.l1loss(mul_render_res['image'], mul_gt_res['image'])
 				mul_raw_loss = self.l1loss(mul_render_res['image_raw'], mul_gt_res['image_raw'])
@@ -169,7 +190,7 @@ class Coach:
 						self.opts.depth_lambda * mul_depth_loss + self.opts.feature_lambda * mul_feature_loss + \
 						self.opts.id_lambda * mul_category_loss
 
-			if self.opts.use_gan_loss or self.global_step > self.opts.add_gan_loss_step:
+			if self.opts.use_gan_loss and self.global_step > self.opts.add_gan_loss_step:
 				# loss += self.opts.gan_lambda * self.net.discriminator_loss(render_res['image'])
 				r1_gamma = 10
 				self.D_opt.zero_grad()
@@ -199,13 +220,12 @@ class Coach:
 							
 
 			loss.backward()
-			self.optimizer_renderer.step()
+			# self.optimizer_renderer.step()
 			self.optimizer_encoder.step()
 			if self.opts.use_encoder_scheduler:
 				self.scheduler_encoder.step(self.global_step)
 			if self.opts.use_renderer_scheduler:
 				self.scheduler_renderer.step(self.global_step)
-			self.global_step += 1
 
 			if self.global_step % self.opts.print_interval == 0:
 				print(f"Step {self.global_step}: loss = {loss.item()}, triloss = {triloss.item()}")
@@ -224,12 +244,12 @@ class Coach:
 				# self.logger.add_scalar("encoder_learning_rate", self.optimizer_encoder.param_groups[0]['lr'], self.global_step)
 				# self.logger.add_scalar("renderer_learning_rate", self.optimizer_renderer.param_groups[0]['lr'], self.global_step)
 
-				if self.opts.use_gan_loss or self.global_step > self.opts.add_gan_loss_step:
+				if self.opts.use_gan_loss and self.global_step > self.opts.add_gan_loss_step:
 					print(f"loss_gan = {loss_gan.item()}, loss_Dgt = {loss_Dgt.item()}, loss_Dgen = {loss_Dgen.item()}")
 					self.logger.add_scalar("loss_gan", loss_gan.item(), self.global_step)
 					self.logger.add_scalar("loss_Dgt", loss_Dgt.item(), self.global_step)
 					self.logger.add_scalar("loss_Dgen", loss_Dgen.item(), self.global_step)
-				if self.opts.use_mul_loss or self.global_step > self.opts.apply_mul_loss_step:
+				if self.opts.use_mul_loss and self.global_step > self.opts.apply_mul_loss_step:
 					print(f"mul_image_loss = {mul_image_loss.item()}, mul_raw_loss = {mul_raw_loss.item()}")
 					print(f"mul_image_lpips_loss = {mul_image_lpips_loss.item()}, mul_raw_lpips_loss = {mul_raw_lpips_loss.item()}")
 					print(f"mul_loss_depth = {mul_depth_loss.item()}, mul_loss_feature = {mul_feature_loss.item()}")
@@ -247,38 +267,83 @@ class Coach:
 				# Image.fromarray(((1 + gt_res['image'][0].clamp(-1,1)).detach().cpu().numpy().transpose(1, 2, 0) / 2 * 255).astype(np.uint8)).save('debug_image/' + 'testgt' + str(self.global_step) + '.png')
 				vis_render_res = (1 + render_res['image'][0].clamp(-1,1)).detach().cpu().numpy().transpose(1, 2, 0) / 2 * 255
 				vis_gt_res = (1 + gt_res['image'][0].clamp(-1,1)).detach().cpu().numpy().transpose(1, 2, 0) / 2 * 255
-				plt.imsave("debug_image/" + "test_vis" + str(self.global_step) + ".png", np.concatenate([vis_render_res, vis_gt_res], axis=1).astype(np.uint8))
+				# plt.imsave("debug_image8/" + "test_vis" + str(self.global_step) + ".png", np.concatenate([vis_render_res, vis_gt_res], axis=1).astype(np.uint8))
+				plt.imsave(self.opts.image_log_path + "test_vis" + str(self.global_step) + ".png", np.concatenate([vis_render_res, vis_gt_res], axis=1).astype(np.uint8))
 
+			self.global_step += 1
 			if self.global_step % self.opts.save_interval == 0:
 				self.checkpoint_me(is_best=False)
 
 	def train(self):
 		self.net.train()
+		ckpt = torch.load(self.opts.resume_path, map_location="cpu")
+		self.net.triplane_renderer.load_state_dict(ckpt["renderer_state_dict"])
+		self.net.triplane_renderer.requires_grad_(True)
+		D = self.net.D
+		D.requires_grad_(True)
 		while self.global_step < self.opts.max_steps: 
 			self.optimizer_renderer.zero_grad()
-			triplanes, gt_res, camera_param = self.net.sample_triplane(self.opts.batch_size, self.gen_rand_pose(), self.gen_rand_pose())
+
+			rand_pitch, rand_yawl = self.gen_rand_pose(pitch_range=26, mode='pitch'), self.gen_rand_pose(yaw_range=70, mode='yaw')
+			triplanes, gt_res, camera_param, ws = self.net.sample_triplane(self.opts.batch_size, rand_pitch, rand_yawl, fov_deg=self.gen_rand_pose(mode="fov"), cx=self.gen_rand_pose(mode="cx"), cy=self.gen_rand_pose(mode="cy"))
+			# triplanes, gt_res, camera_param = self.net.sample_triplane(self.opts.batch_size, self.gen_rand_pose(), self.gen_rand_pose())
 			render_res = self.net.triplane_renderer(triplanes, camera_param)
 			# loss
-			loss = self.opts.l2_lambda * self.mse_loss(render_res['image'], gt_res['image'])
-			loss += self.opts.l2_lambda * self.mse_loss(render_res['image_raw'], gt_res['image_raw'])
+			loss = self.opts.l1_lambda * self.l1loss(render_res['image'], gt_res['image'])
+			loss += self.opts.l1_lambda * self.l1loss(render_res['image_raw'], gt_res['image_raw'])
 			loss += self.opts.lpips_lambda * self.lpips_loss(render_res['image'], gt_res['image'])
 			loss += self.opts.lpips_lambda * self.lpips_loss(render_res['image_raw'], gt_res['image_raw'])
 			# loss += self.opts.id_lambda * self.id_loss(render_res['image'], gt_res['image'], gt_res['image'])
 			# loss += self.opts.id_lambda * self.id_loss(render_res['image_raw'], gt_res['image_raw'], gt_res['image_raw'])
+			if self.opts.use_gan_loss and self.global_step > self.opts.add_gan_loss_step:
+				r1_gamma = 1
+				self.D_opt.zero_grad()
+				gt_img_tmp_image = gt_res['image'].detach().requires_grad_(True)
+				gt_img_tmp_raw = gt_res['image_raw'].detach().requires_grad_(True)
+				gt_logits = D({'image_raw': gt_img_tmp_raw, 'image': gt_img_tmp_image}, camera_param)
+				loss_Dgt = torch.nn.functional.softplus(-gt_logits).mean()
+
+				# r1 regularization
+				r1_grads = torch.autograd.grad(outputs=[gt_logits.sum()], inputs=[gt_img_tmp_image, gt_img_tmp_raw], create_graph=True, only_inputs=True)
+				r1_grads_image = r1_grads[0]
+				r1_grads_image_raw = r1_grads[1]
+				r1_penalty = r1_grads_image.square().sum([1,2,3]) + r1_grads_image_raw.square().sum([1,2,3])
+				loss_Dr1 = (r1_penalty * (r1_gamma / 2))
+				(loss_Dgt + loss_Dr1).mean().backward(retain_graph=True)
+
+				pred_logits = D({'image_raw': render_res['image_raw'].detach(), 'image': render_res['image'].detach()}, camera_param)
+				loss_Dgen = torch.nn.functional.softplus(pred_logits).mean()
+				loss_Dgen.backward()
+				self.D_opt.step()
+
+				# gan loss for generator:
+				logits = D({'image_raw': render_res['image_raw'], 'image': render_res['image']}, camera_param)
+				loss_gan = torch.nn.functional.softplus(-logits).mean()
+				loss += self.opts.adv_lambda * loss_gan
 
 			loss.backward()
 			self.optimizer_renderer.step()
-			self.global_step += 1
 
 			if self.global_step % self.opts.print_interval == 0:
 				print(f"Step {self.global_step}: loss = {loss.item()}")
 				self.logger.add_scalar("loss", loss.item(), self.global_step)
+				if self.opts.use_gan_loss and self.global_step > self.opts.add_gan_loss_step:
+					print(f"loss_gan = {loss_gan.item()}, loss_Dgt = {loss_Dgt.item()}, loss_Dgen = {loss_Dgen.item()}")
+					self.logger.add_scalar("loss_gan", loss_gan.item(), self.global_step)
+					self.logger.add_scalar("loss_Dgt", loss_Dgt.item(), self.global_step)
+					self.logger.add_scalar("loss_Dgen", loss_Dgen.item(), self.global_step)
 
 			if self.global_step % self.opts.image_interval == 0:
-				Image.fromarray(((1 + render_res['image'][0].clamp(-1,1)).detach().cpu().numpy().transpose(1, 2, 0) / 2 * 255).astype(np.uint8)).save('debug_image11/' + 'test' + str(self.global_step) + '.png')
-				
+				# Image.fromarray(((1 + render_res['image'][0].clamp(-1,1)).detach().cpu().numpy().transpose(1, 2, 0) / 2 * 255).astype(np.uint8)).save('debug_image5/' + 'test' + str(self.global_step) + '.png')
+				vis_render_res = (1 + render_res['image'][0].clamp(-1,1)).detach().cpu().numpy().transpose(1, 2, 0) / 2 * 255
+				vis_gt_res = (1 + gt_res['image'][0].clamp(-1,1)).detach().cpu().numpy().transpose(1, 2, 0) / 2 * 255
+				plt.imsave(os.path.join(self.opts.image_log_path,  "test_vis" + str(self.global_step) + ".png"), np.concatenate([vis_render_res, vis_gt_res], axis=1).astype(np.uint8))
+		
+			self.global_step += 1
 			if self.global_step % self.opts.save_interval == 0:
 				self.checkpoint_me(is_best=False)
+
+
 
 	def checkpoint_me(self, is_best):
 		save_name = 'best_model.pt' if is_best else f'iteration_{self.global_step}.pt'
@@ -316,7 +381,6 @@ class Coach:
 			return optimizer, scheduler
 		else:
 			return optimizer
-
 
 	def __get_save_dict(self):
 		save_dict = {

@@ -1,5 +1,5 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 import torch
 import numpy as np
 from scipy import linalg
@@ -12,6 +12,9 @@ sys.path.append("..")
 from configs.paths_config import val_paths
 from models.Inception.inception import InceptionV3
 from models.triencoder import TriEncoder
+from datasets.dataset import ImageFolderDataset
+from torch.utils.data import DataLoader
+
 # valuate each pretrain weight...
 # self used script ...
 
@@ -53,7 +56,7 @@ def calc_fid(sample_mean, sample_cov, real_mean, real_cov, eps=1e-6):
     return fid
 
 @torch.no_grad()
-def compute_fid(net, inception, model_path, batch_size, n_sample=10000):
+def compute_fid(net, inception, model_path, dataloader, batch_size, n_sample=10000):
     basename = os.path.basename(model_path)
 
     n_batch = n_sample // batch_size
@@ -73,16 +76,23 @@ def compute_fid(net, inception, model_path, batch_size, n_sample=10000):
     else:
         print("pred.....")
         pred_features = []
+        # pred_features = np.zeros((n_sample, 2048))
+        # for idx, batch in enumerate(tqdm(batch_sizes)):
         for batch in tqdm(batch_sizes):
-            # print(batch)
-            _, encoder_input, camera_param, ws = net.sample_triplane(batch, gen_rand_pose(pitch_range=26, mode='pitch'), gen_rand_pose(yaw_range=49, mode='yaw'))
-            gen_triplanes = net.encoder(encoder_input['image'])
-            render_res = net.triplane_renderer(gen_triplanes, camera_param)
-            # mul_res, _ = net.render_from_pretrain(batch, gen_rand_pose(pitch_range=26, mode='pitch'), gen_rand_pose(yaw_range=49, mode='yaw'), ws) # 
+            # _, encoder_input, camera_param, ws = net.sample_triplane(batch, gen_rand_pose(pitch_range=26, mode='pitch'), gen_rand_pose(yaw_range=49, mode='yaw'))
+            # gen_triplanes = net.encoder(encoder_input['image'])
+            # render_res = net.triplane_renderer(gen_triplanes, camera_param)
+            # img = render_res['image']
+            image, label = next(iter(dataloader))
+            image = image.to(device) # [B, 3, 512, 512] range: (0, 255) -> (-1, 1) should divide 127.5 and sub 1
+            label = label.to(device) # [B, 25]
+            gen_triplanes = net.encoder((image.float()/127.5 - 1))
+            render_res = net.triplane_renderer(gen_triplanes, label)
             img = render_res['image']
-            # img = mul_res['image']
             feat = inception(img)[0].view(img.shape[0], -1)
             pred_features.append(feat.to("cpu"))
+            # pred_features[idx * batch_size: idx * batch_size + batch] = feat.to("cpu").numpy()
+        # import pdb; pdb.set_trace()
         pred_features = torch.cat(pred_features, 0).numpy()
         pred_sample_mean = np.mean(pred_features, 0)
         pred_sample_cov = np.cov(pred_features, rowvar=False)
@@ -99,20 +109,25 @@ def compute_fid(net, inception, model_path, batch_size, n_sample=10000):
 
 def testfid50k(model_path):
     # load model
+    batch_size=16
     model_dict = torch.load(model_path)
-    net = TriEncoder().to(device)
+    net = TriEncoder(mode="Normal").to(device)
     net.encoder.load_state_dict(model_dict['encoder_state_dict'])
     net.triplane_renderer.load_state_dict(model_dict['renderer_state_dict'])
 
+    path = '/raid/xjd/workspace/eg3d/dataset_preprocessing/ffhq/final_crops'
+    image_datasets = ImageFolderDataset(path=path, resolution=None, use_labels=True)
+    dataloader = DataLoader(dataset=image_datasets, batch_size=batch_size, shuffle=True, num_workers=8)
+
     inception = InceptionV3([3], normalize_input=False).to(device)
     inception.eval()
-    compute_fid(net, inception, model_path, batch_size=8, n_sample=50000)
+    compute_fid(net, inception, model_path, dataloader, batch_size=batch_size, n_sample=50000)
     del net, inception
 
 def main():
-    ckpt_path = "exp/checkpoints"
-    # ckpt_list = os.listdir(ckpt_path)
-    ckpt_list = ['iteration_200000.pt']
+    ckpt_path = "exp10/checkpoints"
+    ckpt_list = os.listdir(ckpt_path)
+    ckpt_list = ['iteration_140000.pt']
     for ckpt in ckpt_list:
         if ckpt.endswith(".pt"):
             model_path = os.path.join(ckpt_path, ckpt)
