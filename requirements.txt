@@ -1,3 +1,4 @@
+ninja
 torch>=1.12.0
 torchvision
 opencv-python
@@ -6,16 +7,13 @@ pillow
 imageio
 pyrender
 matplotlib
-json
 einops
-pickle
-pprint
 scipy
 typing
 trimesh
 tqdm
 timm
 facenet_pytorch
-face_alignment>=1.14.0
+face_alignment
 segmentation_models_pytorch
 
