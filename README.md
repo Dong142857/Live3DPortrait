@@ -5,7 +5,8 @@ This is an unofficial implement of [Live3DPortrait: Real-Time Radiance Fields fo
 ![display2](./docs/display2.png)
 ![display3](./docs/display3.png)
 
-https://github.com/Dong142857/Live3DPortrait/assets/47628302/ce27ffc3-67d2-4174-8c20-b4086b5d08e4
+https://github.com/Dong142857/Live3DPortrait/assets/47628302/d00b104c-3a9c-4ce0-bad7-379ed85a7e8e
+
 
 
 
