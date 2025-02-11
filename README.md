@@ -30,8 +30,7 @@ Place them under `./pretrained_models/` folder.
 python scripts/inference.py --input ./imgs/input.png --output ./imgs/output.png --checkpoint ./checkpoints/ckpt.pth 
 ```
 
-Notice that the input image should be preprocessed folowing the [EG3D](https://github.com/NVlabs/eg3d).
-Note that the LT model implement has some difference with the original implement, but achieve the nearly same performance.
+Note that the input image should be preprocessed as per [EG3D](https://github.com/NVlabs/eg3d). The LT model implementation differs from the original, yet achieves nearly identical performance.
 
 ## TODO
 - [x] Upload inference code and checkpoint.
