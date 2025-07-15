@@ -19,6 +19,8 @@ Place them under `./pretrained_models/` folder.
 └── root
     ...
     └── pretrained_models
+        └── encoder_render_LT_90000.pt
+        └── encoder_render_normal_140000.pt
         └── encoder_render.pt
         └── ffhqrebalanced512-128.pth
         └── model_ir_se50.pth        
@@ -27,7 +29,7 @@ Place them under `./pretrained_models/` folder.
 ## Usage
 
 ```bash
-python scripts/inference.py --input ./imgs/input.png --output ./imgs/output.png --checkpoint ./checkpoints/ckpt.pth 
+python scripts/inference.py --image ./imgs/3.png --output ./imgs/ --model ./pretrained_models/encoder_render_normal_140000.pt --mode Normal
 ```
 
 Note that the input image should be preprocessed as per [EG3D](https://github.com/NVlabs/eg3d). The LT model implementation differs from the original, yet achieves nearly identical performance.
